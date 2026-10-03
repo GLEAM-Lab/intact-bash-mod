@@ -2,7 +2,8 @@ import { expect, test } from 'claude-code/testing'
 
 // What Claude Code would answer: the environment of a Windows session, a clock, a file system that records writes,
 // and the Bash tool, which reports the command it was given
-function stubs(on, written: Map<string, string>, env: Record<string, string | undefined> = {}) {
+function stubs(on, written: Map<string, string>, env: Record<string, string | undefined> = {},
+               statementDecision: string | undefined = undefined) {
   const vars = { OS: 'Windows_NT', LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local', ...env }
   on('env.get', ($, e) => ({ value: vars[e.name] }))
   on('clock.now', () => ({ value: 1790000000000 }))
@@ -17,8 +18,10 @@ function stubs(on, written: Map<string, string>, env: Record<string, string | un
   })
   on('tool.call', ($, e) => ({ result: { ran: e.command } }))
   // the engine's permission decision: a deny rule for rm, an ask for git push, everything else allowed
+  // (statementDecision, when given, is the decision on every delivery statement)
   on('tool.check', ($, e) => {
     const c = String(e.input.command)
+    if (statementDecision && c.startsWith(". '")) return { decision: statementDecision, reason: 'statement' }
     if (/(^|[;&|\n]\s*)rm\s/.test(c)) return { decision: 'deny', reason: 'denied by rule', rule: 'Bash(rm:*)' }
     if (/(^|[;&|\n]\s*)git push\b/.test(c)) return { decision: 'ask', reason: 'needs approval' }
     return { decision: 'allow' }
@@ -36,7 +39,7 @@ test('a rerouted command is decided as the command it delivers: a deny rule stil
   stubs(on, written)
   const statement = await rerouted($, "rm -rf build <<'EOF'\nx\nEOF")
   expect(statement).toMatch(/^\. '/)
-  expect(await $.tool.check({ tool: 'Bash', input: { command: statement } })).toMatchObject({ decision: 'deny', rule: 'Bash(rm:*)' })
+  expect(await $.tool.check({ tool: 'Bash', input: { command: statement } })).toMatchObject({ decision: 'deny', reason: 'denied by rule' })
 })
 
 test('a rerouted command that needs approval is still asked for, and an allowed one is allowed', async ($, on) => {
@@ -46,6 +49,14 @@ test('a rerouted command that needs approval is still asked for, and an allowed 
   expect(await $.tool.check({ tool: 'Bash', input: { command: ask } })).toMatchObject({ decision: 'ask' })
   const allow = await rerouted($, "cat <<'EOF'\nx\nEOF")
   expect(await $.tool.check({ tool: 'Bash', input: { command: allow } })).toMatchObject({ decision: 'allow' })
+})
+
+test('the mod never allows a call by itself: an allowed command goes on to the decision on its statement', async ($, on) => {
+  const written = new Map<string, string>()
+  // a decider beneath that denies every delivery statement: the mod must not answer with the command's allow
+  stubs(on, written, {}, 'deny')
+  const statement = await rerouted($, "cat <<'EOF'\nx\nEOF")
+  expect(await $.tool.check({ tool: 'Bash', input: { command: statement } })).toMatchObject({ decision: 'deny', reason: 'statement' })
 })
 
 test('a statement whose file cannot be read, and any other command, is decided as it stands', async ($, on) => {

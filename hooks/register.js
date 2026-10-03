@@ -5,13 +5,9 @@
 // crosses neither, so this mod writes a hazardous command to a file and replaces the tool input with  . '<file>'
 // (sourced in the same shell: cd, exports and the exit status behave as before).
 //
-// Rule, as the hook of the plugin (../../claude-code-plugin/hooks/win_bash_delivery.py): reroute a command longer
-// than LIMIT characters, or one with a heredoc or a backslash pair; refuse a command that no channel carries (a
-// carriage return before a line feed) or that asks how it was read; pass everything else. The mod runs inside
-// Claude Code, so no process is started per call. Set INTACT_BASH_DELIVERY=off to disable.
-//
-// Measuring mode (INTACT_MOD_MEASURE=1, for benchmarks only): the hook renders the call and then answers it itself
-// with the time the rendering took, so that nothing is executed.
+// Rule: reroute a command longer than LIMIT characters, or one with a heredoc or a backslash pair; refuse a command
+// that no channel carries (a carriage return before a line feed) or that asks how it was read; pass everything else.
+// The mod runs inside Claude Code, so no process is started per call. Set INTACT_BASH_DELIVERY=off to disable.
 
 const LIMIT = 200
 const REFUSAL_CR =
@@ -200,37 +196,28 @@ async function log($, cmd, r, ms, now) {
 }
 
 export function register(on) {
-  // The permission decision. Claude Code decides on the call it runs, which after a reroute is the delivery
-  // statement; the mod answers with the engine's decision on the command the statement delivers, so that a deny
-  // rule, an ask and the Bash tool's own checks apply to the command as they would without the mod. When the file
-  // cannot be read, the statement is decided as it stands.
-  on('tool.check', { tool: 'Bash' }, async ($, e, next) => (await deliveredDecision($, e.input)) || next(e))
+  // The permission decision on a Bash call. Claude Code decides on the call it runs, which after a reroute is the
+  // delivery statement. When Claude Code's own decision on the delivered command (read back from its file) is to deny
+  // it or to ask, the mod denies or asks; otherwise the statement goes on to Claude Code's decision as usual. The mod
+  // never allows a call by itself: a deny rule, an ask rule and the Bash tool's own checks apply to the command as
+  // they would without the mod.
+  on('tool.check', { tool: 'Bash' }, async ($, e, next) => {
+    const d = await deliveredDecision($, e.input)
+    if (d && d.decision === 'deny') {
+      return { decision: 'deny', reason: d.reason || 'Denied for the command this statement delivers.' }
+    }
+    if (d && d.decision === 'ask') {
+      return { decision: 'ask', reason: d.reason || 'The command this statement delivers needs approval.' }
+    }
+    return next(e)
+  })
 
+  // The delivery of a Bash call: pass it, refuse it with the hop named, or replace its command with the statement
+  // that sources the file the command was written to.
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    const measuring = (await $.env.get('INTACT_MOD_MEASURE')) === '1'
     const t0 = await $.clock.now()
     const r = await render($, e.command)
     const t1 = await $.clock.now()
-    if (measuring) {
-      // the decision a rerouted call then gets and the time it takes (read the file back, ask the engine), against
-      // the time of the engine's own decision on the command as Claude Code takes it without the mod
-      let check_ms = null
-      let own_check_ms = null
-      let decision = null
-      if (r.command) {
-        const b0 = await $.clock.now()
-        await $.tool.check({ tool: 'Bash', input: { command: e.command } })
-        const b1 = await $.clock.now()
-        const d = await deliveredDecision($, { command: r.command })
-        check_ms = (await $.clock.now()) - b1
-        own_check_ms = b1 - b0
-        decision = d ? d.decision : 'unread'
-      }
-      // an answer to a Bash call has the shape of the Bash tool's own result
-      const outcome = r.pass ? 'pass' : r.deny ? 'deny' : 'reroute'
-      const stdout = JSON.stringify({ ms: t1 - t0, check_ms, own_check_ms, decision, outcome })
-      return { result: { stdout, stderr: '', interrupted: false, isImage: false, noOutputExpected: false } }
-    }
     await log($, e.command, r, t1 - t0, t1)
     if (r.pass) return next(e)
     if (r.deny) return { deny: r.deny }

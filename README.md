@@ -16,11 +16,25 @@ A command that no channel carries is refused, and the message names the hop:
 - a command the mod would deliver as a file that asks how it was read (`$BASH_SOURCE`, `$BASH_EXECUTION_STRING`,
   `$FUNCNAME`, `caller`, or a `return` outside a function): `Not run (hop: host wrapper). ...`
 
-**Permissions are unchanged.** Claude Code decides whether a call may run on the call it runs, which after a reroute
-is the delivery statement. The mod answers that decision with Claude Code's own decision on the delivered command, so
-deny rules, ask rules and the Bash tool's own checks apply to your command exactly as they would without the mod.
-
 On other platforms the mod does nothing.
+
+## What the mod changes, writes and decides
+
+**Tool input.** Only the Bash tool's `command`, and only for a command the rule above reroutes: it is replaced by the
+statement `. '<file>'  # delivered as a file (<n> chars): <first line>`. Every other tool call, and every other Bash
+command, reaches Claude Code unchanged. A refused command is answered with the refusal message and does not run.
+
+**Files.** For each rerouted command the mod writes one file, `%LOCALAPPDATA%\Temp\claude-cmd\<time>-<hash>.sh`,
+holding that command exactly as Claude wrote it, and bash sources it once, for that call. The mod writes nothing
+else, except one small record per Bash call when you turn records on (see below). It never edits a build, start-up,
+settings or instructions file.
+
+**Permission decisions** (`tool.check` hook on the Bash tool). Claude Code decides whether a call may run on the call
+it runs, which after a reroute is the delivery statement. For such a statement the mod reads the delivered command
+back from its file and asks Claude Code how it would decide that command: if Claude Code would deny it, the mod
+denies the statement; if Claude Code would ask, the mod asks; otherwise it leaves the decision on the statement to
+Claude Code as usual. The mod never allows a call by itself, so deny rules, ask rules and the Bash tool's own checks
+apply to your command exactly as they would without the mod. For any other call the hook does nothing.
 
 ## Requirements
 
