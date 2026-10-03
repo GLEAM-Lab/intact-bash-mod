@@ -1,0 +1,4 @@
+{
+  "description": "IntAct for the Bash tool on Windows, as a mod",
+  "modules": ["./register.js"]
+}

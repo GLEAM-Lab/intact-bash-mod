@@ -1,0 +1,10 @@
+{
+  "name": "intact-bash-mod",
+  "version": "0.1.0",
+  "description": "Windows: delivers a Bash command that Git Bash's command line would change (cut at 8,186 characters, merged backslash pairs) as a sourced file, or refuses it with the hop named",
+  "author": {
+    "name": "GLEAM-Lab"
+  },
+  "license": "MIT",
+  "keywords": ["windows", "bash", "git-bash", "msys2", "quoting", "heredoc"]
+}
