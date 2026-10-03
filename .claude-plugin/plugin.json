@@ -6,5 +6,10 @@
     "name": "GLEAM-Lab"
   },
   "license": "MIT",
-  "keywords": ["windows", "bash", "git-bash", "msys2", "quoting", "heredoc"]
+  "keywords": ["windows", "bash", "git-bash", "msys2", "quoting", "heredoc"],
+  "homepage": "https://github.com/GLEAM-Lab/intact-bash-mod",
+  "repository": "https://github.com/GLEAM-Lab/intact-bash-mod",
+  "documentationUrl": "https://github.com/GLEAM-Lab/intact-bash-mod#readme",
+  "supportUrl": "https://github.com/GLEAM-Lab/intact-bash-mod/issues",
+  "privacyPolicyUrl": "https://github.com/GLEAM-Lab/intact-bash-mod#privacy"
 }

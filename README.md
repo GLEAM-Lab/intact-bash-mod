@@ -59,6 +59,12 @@ tests.
 - Delivered files are not removed by the mod; delete `%LOCALAPPDATA%\Temp\claude-cmd\` when you like.
 - Uninstall it like any plugin (`claude plugin uninstall intact-bash-mod@<marketplace>`).
 
+## Privacy
+
+The mod sends nothing anywhere: it makes no network request and has no telemetry. It reads only the environment
+variables named above and the files it wrote itself. The delivered command files and, when you turn them on, the
+records of use stay on your machine.
+
 ## License
 
 MIT, see `LICENSE`.
